@@ -1,0 +1,9 @@
+{
+  "name": "kostentool",
+  "private": true,
+  "type": "module",
+  "description": "Lokale Finanz-App (PWA): Einnahmen und Ausgaben pro Gehaltsperiode",
+  "scripts": {
+    "test": "node --test"
+  }
+}

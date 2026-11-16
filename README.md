@@ -20,6 +20,8 @@ Die App läuft als Web-App (PWA) offline auf dem Gerät. **Alle Daten bleiben au
 
 ### 1. GitHub Pages einschalten
 
+Erst wenn der Pull Request mit der App in `main` gemergt ist:
+
 1. Im Repository auf **Settings → Pages** gehen.
 2. Unter „Build and deployment“ als **Source** „Deploy from a branch“ wählen.
 3. Als **Branch** `main` und den Ordner `/ (root)` wählen, dann **Save**.
@@ -28,7 +30,7 @@ Die App läuft als Web-App (PWA) offline auf dem Gerät. **Alle Daten bleiben au
 ### 2. Auf dem iPhone installieren
 
 1. Die Adresse in **Safari** öffnen. Andere Browser können auf dem iPhone keine Web-App installieren.
-2. Auf das **Teilen-Symbol** tippen (Quadrat mit Pfeil), dann **„Zum Home-Bildschirm“** und **Hinzufügen**.
+2. Auf das **Teilen-Symbol** tippen (Quadrat mit Pfeil; bei neueren iOS-Versionen zuerst auf **„…“**), dann **„Zum Home-Bildschirm“** und **Hinzufügen**.
 3. Die App ab jetzt immer über das neue Symbol am Home-Bildschirm öffnen. Daten, die du in Safari einträgst, sind getrennt von denen der installierten App.
 
 ### 3. Loslegen
@@ -39,7 +41,7 @@ Die App läuft als Web-App (PWA) offline auf dem Gerät. **Alle Daten bleiben au
 
 ### 4. Backup
 
-Unter **Einstellungen → Backup exportieren** sicherst du alles als Datei, am besten in die Dateien-App oder nach iCloud Drive.
+Unter **Einstellungen → Backup exportieren** öffnet sich das Teilen-Menü. Dort **„In Dateien sichern“** wählen und z. B. den Ordner iCloud Drive nehmen.
 Wichtig, weil die Daten nur lokal liegen: Löschst du die App oder wechselst du das Handy, stellst du mit **Backup importieren** alles wieder her.
 
 ## Für Entwickler
