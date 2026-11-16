@@ -213,3 +213,17 @@ h1, h2, h3, p { margin: 0; }
   background: var(--card2); color: var(--text); padding: 10px 16px; border-radius: 20px; font-size: 15px;
   box-shadow: var(--schatten); z-index: 20; max-width: 90vw; text-align: center;
 }
+
+/* Zwei Kreise */
+.ringe { display: flex; justify-content: center; width: 100%; }
+.ringe.zwei { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.ring-spalte { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; }
+.ring.klein-ring { width: 150px; height: 150px; }
+.ring.klein-ring .ring-mitte .klein { font-size: 12px; }
+.ring-knopf { border: none; background: transparent; padding: 0; display: block; color: inherit; border-radius: 50%; }
+.ring-knopf:active { opacity: 0.7; }
+.ring-knopf:focus-visible { outline: 2px solid var(--akzent); outline-offset: 4px; }
+.ring-unter { font-size: 13px; color: var(--text2); text-align: center; }
+.ring-unter strong { color: var(--text); }
+.negativ { color: var(--orange) !important; }
+.veraltet { color: var(--orange) !important; }

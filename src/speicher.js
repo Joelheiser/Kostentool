@@ -1,8 +1,10 @@
 // Lokaler Speicher im Browser (IndexedDB). Nichts verlässt das Gerät.
 
 const DB_NAME = 'kostentool';
-const DB_VERSION = 1;
-const LISTEN = ['buchungen', 'vorlagen', 'ausnahmen'];
+const DB_VERSION = 2;
+// Version 2: zusätzlich "kontostaende". Bestehende Daten bleiben beim Update erhalten,
+// weil nur fehlende Speicher angelegt werden.
+const LISTEN = ['buchungen', 'vorlagen', 'ausnahmen', 'kontostaende'];
 
 let dbPromise = null;
 
@@ -40,12 +42,12 @@ function alle(store) {
 export async function ladeAlles() {
   const db = await oeffne();
   const tx = db.transaction([...LISTEN, 'einstellungen'], 'readonly');
-  const [buchungen, vorlagen, ausnahmen, einstellungsListe] = await Promise.all([
+  const [buchungen, vorlagen, ausnahmen, kontostaende, einstellungsListe] = await Promise.all([
     ...LISTEN.map((n) => alle(tx.objectStore(n))),
     alle(tx.objectStore('einstellungen')),
   ]);
   const einstellungen = Object.fromEntries(einstellungsListe.map((e) => [e.key, e.value]));
-  return { daten: { buchungen, vorlagen, ausnahmen }, einstellungen };
+  return { daten: { buchungen, vorlagen, ausnahmen, kontostaende }, einstellungen };
 }
 
 /** Mehrere Änderungen in einer Transaktion: [{liste, put}|{liste, delete}] */
@@ -72,7 +74,7 @@ export async function ersetzeAlles(daten) {
   for (const name of LISTEN) {
     const store = tx.objectStore(name);
     store.clear();
-    for (const eintrag of daten[name]) store.put(eintrag);
+    for (const eintrag of daten[name] ?? []) store.put(eintrag);
   }
   return fertig(tx);
 }

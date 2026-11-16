@@ -13,6 +13,7 @@ Die App läuft als Web-App (PWA) offline auf dem Gerät. **Alle Daten bleiben au
   - Buchungen nach Tag gruppiert, getrennt nach „Geplant“ und „Erledigt“
   - Status automatisch nach Datum
   - kein Übertrag zwischen Perioden
+- **Kontostand:** Ein zweiter Kreis zeigt deinen tatsächlichen Kontostand. Du trägst ihn per Tippen auf den Kreis ein, einmal pro Tag, auch mit Minus.
 - **Backup:** Export und Import als Datei. Die App erinnert, wenn das letzte Backup älter als 30 Tage ist.
 - **Darstellung:** Hell- und Dunkelmodus nach iPhone-Einstellung.
 
