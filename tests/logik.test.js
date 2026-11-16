@@ -7,6 +7,7 @@ import { eintraegeDerPeriode, summen } from '../src/berechnung.js';
 import { parseBetrag, formatEuro } from '../src/geld.js';
 import { exportDaten, pruefeImport, erinnerungFaellig } from '../src/sicherung.js';
 import { plusTage, wochentag, heute, tageZwischen } from '../src/datum.js';
+import { parseKontostand, letzterKontostand } from '../src/kontostand.js';
 
 test('Ostersonntag', () => {
   assert.equal(ostersonntag(2024), '2024-03-31');
@@ -165,8 +166,14 @@ test('Export und Import ergeben dieselben Daten', () => {
     vorlagen: [{ id: 'v', art: 'ausgabe', betragCent: 20000, bezeichnung: 'Miete', termin: 1, rhythmus: 'monatlich', startDatum: '2026-12-01', endDatum: null }],
     ausnahmen: [{ id: 'v@2027-01-01', vorlageId: 'v', datum: '2027-01-01', aktion: 'ueberspringen' }],
   };
+  daten.kontostaende = [{ id: '2026-11-16', datum: '2026-11-16', betragCent: -1234 }];
   const text = JSON.stringify(exportDaten(daten, '2026-11-16'));
   assert.deepEqual(pruefeImport(text), daten);
+  // Backups aus Version 1 (ohne Kontostände) lassen sich weiter laden.
+  const alt = JSON.parse(text); alt.version = 1; delete alt.kontostaende;
+  assert.deepEqual(pruefeImport(alt).kontostaende, []);
+  const kaputt = JSON.parse(text); kaputt.kontostaende = [{ id: 'x', datum: '2026-11-16', betragCent: 5 }];
+  assert.deepEqual(pruefeImport(kaputt).kontostaende, [{ id: '2026-11-16', datum: '2026-11-16', betragCent: 5 }]);
   assert.throws(() => pruefeImport('{}'), /kein Kostentool-Backup/);
   assert.throws(() => pruefeImport('nicht json'), /kein JSON/);
 });
@@ -185,4 +192,20 @@ test('Datum ohne Zeitzonen-Falle', () => {
   assert.equal(heute(new Date(2026, 10, 17, 0, 1)), '2026-11-17');
   assert.equal(plusTage('2026-03-28', 2), '2026-03-30'); // Sommerzeit
   assert.equal(tageZwischen('2026-11-16', '2026-12-15'), 29);
+});
+
+test('Kontostand', () => {
+  assert.equal(parseKontostand('1.234,56'), 123456);
+  assert.equal(parseKontostand('-120'), -12000);
+  assert.equal(parseKontostand('−120,50'), -12050);
+  assert.equal(parseKontostand('0'), 0);
+  assert.equal(parseKontostand('abc'), null);
+  const liste = [
+    { id: '2026-11-10', datum: '2026-11-10', betragCent: 1 },
+    { id: '2026-11-14', datum: '2026-11-14', betragCent: 2 },
+    { id: '2026-11-16', datum: '2026-11-16', betragCent: 3 },
+  ];
+  assert.equal(letzterKontostand(liste, '2026-11-13', '2026-11-15').betragCent, 2);
+  assert.equal(letzterKontostand(liste, '2026-11-13', '2026-12-14').betragCent, 3);
+  assert.equal(letzterKontostand(liste, '2026-12-15', '2027-01-14'), null);
 });

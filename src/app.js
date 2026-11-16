@@ -6,11 +6,12 @@ import { RHYTHMEN, AM_GEHALTSTAG, ausnahmeId, naechsterTermin, termine } from '.
 import { parseBetrag, formatEuro, alsEingabe } from './geld.js';
 import { exportDaten, pruefeImport, erinnerungFaellig, SCHLUMMER_TAGE } from './sicherung.js';
 import * as S from './speicher.js';
+import { parseKontostand, letzterKontostand } from './kontostand.js';
 
 const app = document.getElementById('app');
 
 const zustand = {
-  daten: { buchungen: [], vorlagen: [], ausnahmen: [] },
+  daten: { buchungen: [], vorlagen: [], ausnahmen: [], kontostaende: [] },
   einstellungen: {},
   heute: D.heute(),
   periode: periodeFuer(D.heute()),
@@ -106,11 +107,11 @@ async function speichern(operationen) {
 
 // ---------- Übersicht ----------
 
-function ringSvg(anteil, negativ) {
+function ringSvg(anteil, negativ, farbeNormal = 'var(--ring)') {
   const r = 80;
   const umfang = 2 * Math.PI * r;
   const laenge = negativ ? umfang : Math.max(0, Math.min(1, anteil)) * umfang;
-  const farbe = negativ ? 'var(--orange)' : 'var(--ring)';
+  const farbe = negativ ? 'var(--orange)' : farbeNormal;
   const bogen = laenge > 0
     ? `<circle cx="100" cy="100" r="${r}" fill="none" stroke="${farbe}" stroke-width="18" stroke-linecap="${laenge >= umfang ? 'butt' : 'round'}" stroke-dasharray="${laenge.toFixed(1)} ${umfang.toFixed(1)}" transform="rotate(-90 100 100)"/>`
     : '';
@@ -177,6 +178,34 @@ function renderUebersicht() {
        </div>`
     : '';
 
+  // Zweiter Kreis: tatsächlicher Kontostand (nicht für kommende Perioden)
+  const kStichtag = aktuell ? heute : periode.ende;
+  const konto = kuenftig ? null : letzterKontostand(zustand.daten.kontostaende, aktuell ? '0000-01-01' : periode.start, kStichtag);
+  let kontoRing = '';
+  if (!kuenftig) {
+    if (konto) {
+      const kNeg = konto.betragCent < 0;
+      const alter = D.tageZwischen(konto.datum, heute);
+      const wann = konto.datum === heute ? 'heute' : alter === 1 ? 'gestern' : D.kurz(konto.datum);
+      const label = `Kontostand ${formatEuro(konto.betragCent)}, eingetragen ${wann}; tippen zum Eintragen`;
+      kontoRing = `<button class="ring klein-ring ring-knopf" data-aktion="kontostand" aria-label="${esc(label)}">
+          ${ringSvg(1, kNeg, 'var(--akzent)')}
+          <span class="ring-mitte" aria-hidden="true">
+            <span class="klein">Konto</span>
+            <span class="gross${konto.betragCent < 0 ? ' negativ' : ''}" style="font-size:${ringSchrift(kompakt(konto.betragCent)) - 6}px">${kompakt(konto.betragCent)}</span>
+            <span class="klein${alter >= 2 && aktuell ? ' veraltet' : ''}">${wann}</span>
+          </span>
+        </button>
+        <span class="ring-unter">Kontostand</span>`;
+    } else {
+      kontoRing = `<button class="ring klein-ring ring-knopf" data-aktion="kontostand" aria-label="Kontostand eintragen">
+          ${ringSvg(0, false)}
+          <span class="ring-mitte" aria-hidden="true"><span class="klein">Konto</span><span class="gross" style="font-size:22px">${ICON.plus}</span><span class="klein">eintragen</span></span>
+        </button>
+        <span class="ring-unter">Kontostand</span>`;
+    }
+  }
+
   const leer = eintraege.length === 0
     ? `<div class="leer" style="margin-top:20px">Noch keine Buchungen in dieser Periode.<br>Tippe auf <strong>+</strong>, um dein Gehalt und deine Fixkosten einzutragen.</div>`
     : '';
@@ -192,13 +221,19 @@ function renderUebersicht() {
     </header>
     ${erinnerung !== null ? `<div class="banner" role="status"><span>Letztes Backup vor ${erinnerung} Tagen</span><button class="textknopf" data-aktion="export">Jetzt sichern</button><button class="rundknopf" data-aktion="schlummern" aria-label="Erinnerung für ${SCHLUMMER_TAGE} Tage ausblenden">${ICON.schliessen}</button></div>` : ''}
     <section class="ringkarte" aria-label="Zusammenfassung">
-      <div class="ring" role="img" aria-label="${esc(ringLabel)}">
-        ${ringSvg(anteil, negativ)}
-        <div class="ring-mitte" aria-hidden="true">
-          <span class="klein">übrig</span>
-          <span class="gross${negativ ? ' negativ' : ''}" style="font-size:${ringSchrift(kompakt(s.uebrig))}px">${kompakt(s.uebrig)}</span>
-          <span class="klein">am ${D.kurz(periode.ende).slice(3)}${prozent ? ` · ${prozent.replace(' übrig', '')}` : ''}</span>
+      <div class="ringe${kontoRing ? ' zwei' : ''}">
+        <div class="ring-spalte">
+          <div class="ring${kontoRing ? ' klein-ring' : ''}" role="img" aria-label="${esc(ringLabel)}">
+            ${ringSvg(anteil, negativ)}
+            <div class="ring-mitte" aria-hidden="true">
+              <span class="klein">übrig</span>
+              <span class="gross${negativ ? ' negativ' : ''}" style="font-size:${ringSchrift(kompakt(s.uebrig)) - (kontoRing ? 6 : 0)}px">${kompakt(s.uebrig)}</span>
+              <span class="klein">am ${D.kurz(periode.ende).slice(3)}${!kontoRing && prozent ? ` · ${prozent.replace(' übrig', '')}` : ''}</span>
+            </div>
+          </div>
+          ${kontoRing ? `<span class="ring-unter">${prozent || 'rechnerisch'}</span>` : ''}
         </div>
+        ${kontoRing ? `<div class="ring-spalte">${kontoRing}</div>` : ''}
       </div>
       <div class="kacheln">${kacheln}</div>
       ${geplantZeile}
@@ -461,6 +496,87 @@ function oeffneSheet(modus, objekt = null) {
   setTimeout(() => schleier.querySelector(modus === 'neu' ? '#f-betrag' : '.sheet-kopf .textknopf')?.focus(), 50);
 }
 
+function oeffneKontostand() {
+  zuletztFokus = document.activeElement;
+  const heute = zustand.heute;
+  const liste = [...zustand.daten.kontostaende].sort((a, b) => b.datum.localeCompare(a.datum));
+  const vorhanden = (datum) => zustand.daten.kontostaende.find((k) => k.id === datum);
+  const startDatum = zustand.heute <= zustand.periode.ende ? heute : zustand.periode.ende;
+  const startWert = vorhanden(startDatum) ?? liste[0];
+
+  const schleier = document.createElement('div');
+  schleier.className = 'schleier';
+  schleier.innerHTML = `
+    <form class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-titel" novalidate>
+      <div class="sheet-griff" aria-hidden="true"></div>
+      <div class="sheet-kopf">
+        <button type="button" class="textknopf" data-sheet="abbrechen">Abbrechen</button>
+        <h2 id="sheet-titel">Kontostand</h2>
+        <button type="submit" class="textknopf fett">Sichern</button>
+      </div>
+      <p class="info" style="margin:8px 4px 4px">Trag ein, was gerade wirklich auf deinem Konto ist. Ein Wert pro Tag. Bei einem überzogenen Konto mit Minus, z. B. -120,00.</p>
+      <div class="betragfeld">
+        <label for="k-betrag" class="versteckt">Kontostand in Euro</label>
+        <input id="k-betrag" inputmode="decimal" autocomplete="off" placeholder="0,00" value="${startWert ? esc(alsEingabe(Math.abs(startWert.betragCent)).replace(/^/, startWert.betragCent < 0 ? '-' : '')) : ''}">
+        <span aria-hidden="true">€</span>
+      </div>
+      <div class="fehler" id="k-fehler" role="alert"></div>
+      <div class="felder">
+        <div class="feld"><label for="k-datum">Datum</label><input type="date" id="k-datum" value="${startDatum}" max="${heute}"></div>
+      </div>
+      <div class="knopfreihe">
+        <button type="submit" class="knopf haupt">Sichern</button>
+        <button type="button" class="knopf gefahr ${vorhanden(startDatum) ? '' : 'versteckt'}" data-sheet="k-loeschen">Eintrag für diesen Tag löschen</button>
+      </div>
+      ${liste.length ? `<h3 class="tag" style="padding-top:20px">Letzte Einträge</h3><div class="liste">${liste.slice(0, 7).map((k) => `<button type="button" class="zeile" style="min-height:44px" data-k-tag="${k.datum}" aria-label="Kontostand vom ${D.lang(k.datum)} bearbeiten"><span class="zeile-text"><span class="titel">${D.tagUeberschrift(k.datum)}</span></span><span class="betrag${k.betragCent < 0 ? ' negativ' : ''}">${formatEuro(k.betragCent)}</span></button>`).join('')}</div>` : ''}
+    </form>`;
+  document.body.append(schleier);
+  const fehler = schleier.querySelector('#k-fehler');
+  const datumFeld = schleier.querySelector('#k-datum');
+  const loeschKnopf = schleier.querySelector('[data-sheet="k-loeschen"]');
+  const betragFeld = schleier.querySelector('#k-betrag');
+  const alsText = (k) => `${k.betragCent < 0 ? '-' : ''}${alsEingabe(Math.abs(k.betragCent))}`;
+  const datumGewaehlt = () => {
+    const k = vorhanden(datumFeld.value);
+    loeschKnopf.classList.toggle('versteckt', !k);
+    if (k) betragFeld.value = alsText(k);
+  };
+  datumFeld.addEventListener('change', datumGewaehlt);
+
+  schleier.addEventListener('click', async (ev) => {
+    if (ev.target === schleier) return schliesseSheet();
+    const was = ev.target.closest('[data-sheet]')?.dataset.sheet;
+    if (was === 'abbrechen') schliesseSheet();
+    const tag = ev.target.closest('[data-k-tag]')?.dataset.kTag;
+    if (tag) { datumFeld.value = tag; datumGewaehlt(); betragFeld.focus(); }
+    if (was === 'k-loeschen') {
+      if (!confirm(`Kontostand vom ${D.lang(datumFeld.value)} löschen?`)) return;
+      await S.aendere([{ liste: 'kontostaende', delete: datumFeld.value }]);
+      await neuLaden();
+      render();
+      schliesseSheet();
+    }
+  });
+  sheetSchliessenBei = (ev) => { if (ev.key === 'Escape') schliesseSheet(); };
+  document.addEventListener('keydown', sheetSchliessenBei);
+
+  schleier.querySelector('form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const cent = parseKontostand(schleier.querySelector('#k-betrag').value);
+    const datum = datumFeld.value;
+    if (cent === null) { fehler.textContent = 'Bitte einen Betrag eingeben, z. B. 1.234,56 oder -120,00.'; return; }
+    if (!D.istGueltig(datum)) { fehler.textContent = 'Bitte ein gültiges Datum wählen.'; return; }
+    if (datum > heute) { fehler.textContent = 'Der Kontostand kann nicht in der Zukunft liegen.'; return; }
+    try {
+      await speichern([{ liste: 'kontostaende', put: { id: datum, datum, betragCent: cent } }]);
+      schliesseSheet();
+    } catch (err) {
+      fehler.textContent = err.message;
+    }
+  });
+  setTimeout(() => schleier.querySelector('#k-betrag')?.select(), 50);
+}
+
 async function speichereNeu(e, wiederholen, rhythmus, terminWahl) {
   if (!wiederholen) {
     return speichern([{ liste: 'buchungen', put: { id: S.neueId(), art: e.art, betragCent: e.cent, bezeichnung: e.name, datum: e.dat } }]);
@@ -551,7 +667,7 @@ async function exportieren() {
 async function importieren(datei) {
   try {
     const daten = pruefeImport(await datei.text());
-    const anzahl = daten.buchungen.length + daten.vorlagen.length;
+    const anzahl = daten.buchungen.length + daten.vorlagen.length + daten.kontostaende.length;
     if (!confirm(`Backup mit ${anzahl} Einträgen laden? Alle aktuellen Daten werden ersetzt.`)) return;
     await S.ersetzeAlles(daten);
     await S.aendere([
@@ -584,6 +700,7 @@ document.addEventListener('click', async (ev) => {
     else oeffneSheet('buchung', zustand.daten.buchungen.find((b) => b.id === e.id));
   }
   if (aktion === 'vorlage') oeffneSheet('vorlage', vorlageVon(el.dataset.id));
+  if (aktion === 'kontostand') oeffneKontostand();
   if (aktion === 'export') exportieren();
   if (aktion === 'import') document.getElementById('importdatei')?.click();
   if (aktion === 'schlummern') {

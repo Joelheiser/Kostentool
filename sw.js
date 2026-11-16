@@ -1,5 +1,5 @@
 // Offline-Cache. Bei jeder neuen App-Version VERSION erhöhen.
-const VERSION = 'kostentool-v1';
+const VERSION = 'kostentool-v2';
 const DATEIEN = [
   './',
   './index.html',
@@ -13,6 +13,7 @@ const DATEIEN = [
   './src/datum.js',
   './src/feiertage.js',
   './src/geld.js',
+  './src/kontostand.js',
   './src/periode.js',
   './src/sicherung.js',
   './src/speicher.js',

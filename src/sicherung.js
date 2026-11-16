@@ -3,7 +3,7 @@ import { istGueltig, tageZwischen } from './datum.js';
 import { RHYTHMEN, AM_GEHALTSTAG } from './wiederkehrend.js';
 
 export const FORMAT = 'kostentool-backup';
-export const VERSION = 1;
+export const VERSION = 2;
 export const ERINNERUNG_TAGE = 30;
 export const SCHLUMMER_TAGE = 7;
 
@@ -15,6 +15,7 @@ export function exportDaten(daten, exportiertAm) {
     buchungen: daten.buchungen,
     vorlagen: daten.vorlagen,
     ausnahmen: daten.ausnahmen,
+    kontostaende: daten.kontostaende ?? [],
   };
 }
 
@@ -41,7 +42,15 @@ export function pruefeImport(json) {
     if (a.neuesDatum != null && !istGueltig(a.neuesDatum)) throw new Error('Eine Ausnahme im Backup ist fehlerhaft.');
     if (a.betragCent != null && !istCent(a.betragCent)) throw new Error('Eine Ausnahme im Backup ist fehlerhaft.');
   }
-  return { buchungen: d.buchungen, vorlagen: d.vorlagen, ausnahmen: d.ausnahmen };
+  // Backups aus Version 1 haben noch keine Kontostände.
+  const kontostaende = d.kontostaende ?? [];
+  if (!Array.isArray(kontostaende)) throw new Error('Im Backup sind die Kontostände fehlerhaft.');
+  for (const k of kontostaende) {
+    if (!istText(k.id) || !istGueltig(k.datum) || !Number.isSafeInteger(k.betragCent)) throw new Error('Ein Kontostand im Backup ist fehlerhaft.');
+  }
+  // Ein Wert pro Tag, die id ist immer das Datum.
+  const proTag = new Map(kontostaende.map((k) => [k.datum, { id: k.datum, datum: k.datum, betragCent: k.betragCent }]));
+  return { buchungen: d.buchungen, vorlagen: d.vorlagen, ausnahmen: d.ausnahmen, kontostaende: [...proTag.values()] };
 }
 
 /**
