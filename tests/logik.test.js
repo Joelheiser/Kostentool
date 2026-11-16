@@ -172,6 +172,8 @@ test('Export und Import ergeben dieselben Daten', () => {
   // Backups aus Version 1 (ohne Kontostände) lassen sich weiter laden.
   const alt = JSON.parse(text); alt.version = 1; delete alt.kontostaende;
   assert.deepEqual(pruefeImport(alt).kontostaende, []);
+  const kaputt = JSON.parse(text); kaputt.kontostaende = [{ id: 'x', datum: '2026-11-16', betragCent: 5 }];
+  assert.deepEqual(pruefeImport(kaputt).kontostaende, [{ id: '2026-11-16', datum: '2026-11-16', betragCent: 5 }]);
   assert.throws(() => pruefeImport('{}'), /kein Kostentool-Backup/);
   assert.throws(() => pruefeImport('nicht json'), /kein JSON/);
 });

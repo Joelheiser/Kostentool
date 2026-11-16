@@ -180,14 +180,14 @@ function renderUebersicht() {
 
   // Zweiter Kreis: tatsächlicher Kontostand (nicht für kommende Perioden)
   const kStichtag = aktuell ? heute : periode.ende;
-  const konto = kuenftig ? null : letzterKontostand(zustand.daten.kontostaende, periode.start, kStichtag);
+  const konto = kuenftig ? null : letzterKontostand(zustand.daten.kontostaende, aktuell ? '0000-01-01' : periode.start, kStichtag);
   let kontoRing = '';
   if (!kuenftig) {
     if (konto) {
       const kNeg = konto.betragCent < 0;
       const alter = D.tageZwischen(konto.datum, heute);
       const wann = konto.datum === heute ? 'heute' : alter === 1 ? 'gestern' : D.kurz(konto.datum);
-      const label = `Kontostand ${formatEuro(konto.betragCent)}, eingetragen ${wann}. Tippen zum Eintragen.`;
+      const label = `Kontostand ${formatEuro(konto.betragCent)}, eingetragen ${wann}; tippen zum Eintragen`;
       kontoRing = `<button class="ring klein-ring ring-knopf" data-aktion="kontostand" aria-label="${esc(label)}">
           ${ringSvg(1, kNeg, 'var(--akzent)')}
           <span class="ring-mitte" aria-hidden="true">
@@ -228,7 +228,7 @@ function renderUebersicht() {
             <div class="ring-mitte" aria-hidden="true">
               <span class="klein">übrig</span>
               <span class="gross${negativ ? ' negativ' : ''}" style="font-size:${ringSchrift(kompakt(s.uebrig)) - (kontoRing ? 6 : 0)}px">${kompakt(s.uebrig)}</span>
-              <span class="klein">am ${D.kurz(periode.ende).slice(3)}</span>
+              <span class="klein">am ${D.kurz(periode.ende).slice(3)}${!kontoRing && prozent ? ` · ${prozent.replace(' übrig', '')}` : ''}</span>
             </div>
           </div>
           ${kontoRing ? `<span class="ring-unter">${prozent || 'rechnerisch'}</span>` : ''}
@@ -528,19 +528,29 @@ function oeffneKontostand() {
         <button type="submit" class="knopf haupt">Sichern</button>
         <button type="button" class="knopf gefahr ${vorhanden(startDatum) ? '' : 'versteckt'}" data-sheet="k-loeschen">Eintrag für diesen Tag löschen</button>
       </div>
-      ${liste.length ? `<h3 class="tag" style="padding-top:20px">Letzte Einträge</h3><div class="liste">${liste.slice(0, 7).map((k) => `<div class="zeile" style="min-height:44px"><span class="zeile-text"><span class="titel">${D.tagUeberschrift(k.datum)}</span></span><span class="betrag${k.betragCent < 0 ? ' negativ' : ''}">${formatEuro(k.betragCent)}</span></div>`).join('')}</div>` : ''}
+      ${liste.length ? `<h3 class="tag" style="padding-top:20px">Letzte Einträge</h3><div class="liste">${liste.slice(0, 7).map((k) => `<button type="button" class="zeile" style="min-height:44px" data-k-tag="${k.datum}" aria-label="Kontostand vom ${D.lang(k.datum)} bearbeiten"><span class="zeile-text"><span class="titel">${D.tagUeberschrift(k.datum)}</span></span><span class="betrag${k.betragCent < 0 ? ' negativ' : ''}">${formatEuro(k.betragCent)}</span></button>`).join('')}</div>` : ''}
     </form>`;
   document.body.append(schleier);
   const fehler = schleier.querySelector('#k-fehler');
   const datumFeld = schleier.querySelector('#k-datum');
   const loeschKnopf = schleier.querySelector('[data-sheet="k-loeschen"]');
-  datumFeld.addEventListener('change', () => loeschKnopf.classList.toggle('versteckt', !vorhanden(datumFeld.value)));
+  const betragFeld = schleier.querySelector('#k-betrag');
+  const alsText = (k) => `${k.betragCent < 0 ? '-' : ''}${alsEingabe(Math.abs(k.betragCent))}`;
+  const datumGewaehlt = () => {
+    const k = vorhanden(datumFeld.value);
+    loeschKnopf.classList.toggle('versteckt', !k);
+    if (k) betragFeld.value = alsText(k);
+  };
+  datumFeld.addEventListener('change', datumGewaehlt);
 
   schleier.addEventListener('click', async (ev) => {
     if (ev.target === schleier) return schliesseSheet();
     const was = ev.target.closest('[data-sheet]')?.dataset.sheet;
     if (was === 'abbrechen') schliesseSheet();
+    const tag = ev.target.closest('[data-k-tag]')?.dataset.kTag;
+    if (tag) { datumFeld.value = tag; datumGewaehlt(); betragFeld.focus(); }
     if (was === 'k-loeschen') {
+      if (!confirm(`Kontostand vom ${D.lang(datumFeld.value)} löschen?`)) return;
       await S.aendere([{ liste: 'kontostaende', delete: datumFeld.value }]);
       await neuLaden();
       render();
@@ -657,7 +667,7 @@ async function exportieren() {
 async function importieren(datei) {
   try {
     const daten = pruefeImport(await datei.text());
-    const anzahl = daten.buchungen.length + daten.vorlagen.length;
+    const anzahl = daten.buchungen.length + daten.vorlagen.length + daten.kontostaende.length;
     if (!confirm(`Backup mit ${anzahl} Einträgen laden? Alle aktuellen Daten werden ersetzt.`)) return;
     await S.ersetzeAlles(daten);
     await S.aendere([

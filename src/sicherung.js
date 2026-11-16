@@ -48,7 +48,9 @@ export function pruefeImport(json) {
   for (const k of kontostaende) {
     if (!istText(k.id) || !istGueltig(k.datum) || !Number.isSafeInteger(k.betragCent)) throw new Error('Ein Kontostand im Backup ist fehlerhaft.');
   }
-  return { buchungen: d.buchungen, vorlagen: d.vorlagen, ausnahmen: d.ausnahmen, kontostaende };
+  // Ein Wert pro Tag, die id ist immer das Datum.
+  const proTag = new Map(kontostaende.map((k) => [k.datum, { id: k.datum, datum: k.datum, betragCent: k.betragCent }]));
+  return { buchungen: d.buchungen, vorlagen: d.vorlagen, ausnahmen: d.ausnahmen, kontostaende: [...proTag.values()] };
 }
 
 /**
